@@ -1,0 +1,14 @@
+
+# IMS runtime outputs
+data/
+__pycache__/
+*.py[cod]
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+.env
+.env.*
+*.log
+reports/
+backups/
