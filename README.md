@@ -39,3 +39,11 @@ Do not commit databases, password hashes, real customer/supplier details or expo
 ## Project status
 
 Educational/local prototype. This upload is preserved, with known defects documented rather than labelled production-ready. This update replaces the old v4 code stored in README.md with real documentation and a separate Python entry point. Earlier versions remain in Git history. No licence has been chosen in this package; choose one before claiming open-source licensing.
+
+## Planned improvements
+
+These are intentions, not existing capabilities: verified database backup/restore, stricter finite-number and unit validation, persistent login auditing, session/activity checks, safe demo seeding, database migrations, and a broader automated regression suite. See [the roadmap](docs/ROADMAP.md) for the proposed order.
+
+## Existing v4 data
+
+v5 does not migrate a v4 database. Start with a fresh database path and preserve the old database separately. Do not point this application at a v4 database expecting an automatic upgrade.
