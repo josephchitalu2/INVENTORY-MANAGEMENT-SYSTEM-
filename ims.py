@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Roberts Fish & Veggies - Inventory Management System v5.0
+"""Chitalu Software Solutions - Inventory Management System v5.0
 
 A deliberately small, real SQLite-backed inventory system.  The CLI is only a
 presentation layer; business rules live in services and database writes that
@@ -25,7 +25,7 @@ from getpass import getpass
 from pathlib import Path
 from typing import Any, Iterator
 
-APP_NAME = "Roberts Fish & Veggies IMS"
+APP_NAME = "IMS by Chitalu Software Solutions"
 APP_VERSION = "5.0"
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -426,14 +426,14 @@ class ReportService:
 def seed_demo(user_id: int) -> int:
     service = InventoryService()
     products = [
-        ("Fresh Fish", "Fresh", "kg", 43.70, 48, 65, "Roberts Supplier", 10),
-        ("Chicken Pieces", "Fresh Meat", "kg", 28.50, 55, 72, "Roberts Supplier", 8),
-        ("Sausage", "Fresh Meat", "kg", 18.25, 60, 82, "Roberts Supplier", 5),
-        ("Smoked Fish", "Fish", "kg", 16.80, 75, 105, "Roberts Supplier", 5),
-        ("Game Meat - Impala", "Game Meat", "kg", 12.00, 90, 125, "Roberts Supplier", 4),
-        ("Game Meat - Buffalo", "Game Meat", "kg", 9.50, 85, 120, "Roberts Supplier", 3),
-        ("Dlite Cooking Oil", "Groceries", "bottle", 24, 30, 38, "Roberts Supplier", 6),
-        ("Cornflakes", "Groceries", "pack", 18, 42, 52, "Roberts Supplier", 5),
+        ("Fresh Fish", "Fresh", "kg", 43.70, 48, 65, "Demo Supplier", 10),
+        ("Chicken Pieces", "Fresh Meat", "kg", 28.50, 55, 72, "Demo Supplier", 8),
+        ("Sausage", "Fresh Meat", "kg", 18.25, 60, 82, "Demo Supplier", 5),
+        ("Smoked Fish", "Fish", "kg", 16.80, 75, 105, "Demo Supplier", 5),
+        ("Game Meat - Impala", "Game Meat", "kg", 12.00, 90, 125, "Demo Supplier", 4),
+        ("Game Meat - Buffalo", "Game Meat", "kg", 9.50, 85, 120, "Demo Supplier", 3),
+        ("Dlite Cooking Oil", "Groceries", "bottle", 24, 30, 38, "Demo Supplier", 6),
+        ("Cornflakes", "Groceries", "pack", 18, 42, 52, "Demo Supplier", 5),
     ]
     created = 0
     for p in products:

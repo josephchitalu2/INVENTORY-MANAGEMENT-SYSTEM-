@@ -1,4 +1,4 @@
-# Roberts Fish & Veggies IMS
+# IMS by Chitalu Software Solutions
 
 A Python CLI inventory application for a small retail shop, with SQLite persistence, weighted stock and role-based write operations. The supplied file identifies itself as **v5.0**; its upload filename was `ims_v5_1(1).py`. This package uses `ims.py` as the canonical entry point. Built through iterative development with AI assistance.
 
