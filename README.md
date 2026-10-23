@@ -1,8 +1,44 @@
-# Roberts Fish & Veggies IMS
+# IMS by Chitalu Software Solutions
 
 A Python CLI inventory application for a small retail shop, with SQLite persistence, weighted stock and role-based write operations. The supplied file identifies itself as **v5.0**; its upload filename was `ims_v5_1(1).py`. This package uses `ims.py` as the canonical entry point. Built through iterative development with AI assistance.
 
-## Run
+## Browser demo (Vercel)
+
+The repository now includes `app.py`, a Flask web entry point, and `vercel.json`.
+Vercel deploys the web demo; the original `python3 ims.py` CLI remains available.
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 app.py
+# Open http://127.0.0.1:5000
+```
+
+The demo supports product creation/editing, weighted stock in/out, low-stock
+filtering, movement history, CSV exports, and JSON backup/restore. The browser
+sends its synthetic snapshot to a request-isolated in-memory SQLite database;
+operations use the existing Python services. The resulting snapshot is saved
+in browser localStorage. No shared server database or demo login is involved.
+Each visitor has their own workspace. Private browsing or another device has
+a separate workspace. Clearing browser data loses records unless backed up.
+
+**Portfolio demo only:** use fictional data. This is not a shared shop service,
+an authenticated account system, or durable cloud storage. An external database,
+authenticated sessions, and an operational backup/recovery plan are required
+before adapting it for real business use. Audit records in browser backups are
+editable and are not proof of activity. Limits: 100 products, 500 movements,
+1,000 audit rows, 1 MB requests. Unit conversion is blocked to preserve meaning.
+
+Deploy the repository root with the Flask preset (declared in `vercel.json`).
+No environment secrets are required. Do not configure a custom output directory
+or a CLI command as the build/start command. Vercel discovers the `app` instance
+in `app.py`. Existing Vercel deployment access protection remains a separate
+project setting; a successful build does not make a protected preview public.
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+## Run CLI
 
 Requires Python 3.10+ and its standard library. No pip packages are required.
 

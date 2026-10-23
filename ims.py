@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Roberts Fish & Veggies - Inventory Management System v5.0
+"""Chitalu Software Solutions - Inventory Management System v5.0
 
 A deliberately small, real SQLite-backed inventory system.  The CLI is only a
 presentation layer; business rules live in services and database writes that
@@ -12,18 +12,20 @@ import csv
 import hashlib
 import hmac
 import json
+import math
 import os
 import secrets
 import sqlite3
 import sys
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from getpass import getpass
 from pathlib import Path
 from typing import Any, Iterator
 
-APP_NAME = "Roberts Fish & Veggies IMS"
+APP_NAME = "IMS by Chitalu Software Solutions"
 APP_VERSION = "5.0"
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -35,8 +37,8 @@ ALLOWED_UNITS = {"kg", "pack", "bottle", "piece"}
 DISCRETE_UNITS = {"pack", "bottle", "piece"}
 ROLES = {"admin", "manager", "staff"}
 
-for directory in (DATA_DIR, BACKUP_DIR, REPORT_DIR):
-    directory.mkdir(parents=True, exist_ok=True)
+# Web requests use isolated in-memory connections. CLI keeps its on-disk DB.
+REQUEST_DATABASE: ContextVar[sqlite3.Connection | None] = ContextVar("request_database", default=None)
 
 
 class IMSException(Exception): pass
@@ -81,7 +83,7 @@ def validate_quantity(amount: float, unit: str) -> float:
         value = float(amount)
     except (TypeError, ValueError):
         raise ValidationError("Quantity must be a number")
-    if value <= 0:
+    if not math.isfinite(value) or value <= 0:
         raise ValidationError("Quantity must be greater than zero")
     if unit not in ALLOWED_UNITS:
         raise ValidationError(f"Invalid unit '{unit}'. Allowed: {', '.join(sorted(ALLOWED_UNITS))}")
@@ -95,15 +97,20 @@ def validate_price(value: float, field: str) -> float:
         result = float(value)
     except (TypeError, ValueError):
         raise ValidationError(f"{field} must be a number")
-    if result < 0:
+    if not math.isfinite(result) or result < 0:
         raise ValidationError(f"{field} cannot be negative")
     return result
 
 
 @contextmanager
 def db() -> Iterator[sqlite3.Connection]:
+    scoped = REQUEST_DATABASE.get()
+    if scoped is not None:
+        yield scoped
+        return
     conn = None
     try:
+        DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(DATABASE_PATH), timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -256,7 +263,7 @@ class AuthService:
         user = self.users.find_by_username(username)
         if not user or not user["active"] or not verify_password(password, user["password_hash"]):
             raise AuthenticationError("Invalid username or password")
-        with db() as conn:
+        with transaction() as conn:
             conn.execute("INSERT INTO audit_log(user_id,action,table_name,record_id,new_values) VALUES(?,?,?,?,?)", (user["id"],"login","users",user["id"],json.dumps({"success":True})))
         user.pop("password_hash", None)
         return user
@@ -274,7 +281,7 @@ class AuthService:
         user = self.users.find(user_id)
         if not user:
             raise UserNotFoundError("User not found")
-        if user["role"] not in allowed:
+        if not user["active"] or user["role"] not in allowed:
             raise AuthorizationError("You are not authorized to perform this operation")
         return user
 
@@ -304,7 +311,7 @@ class InventoryService:
         if not name:
             raise ValidationError("Item name is required")
         quantity = float(quantity)
-        if quantity < 0:
+        if not math.isfinite(quantity) or quantity < 0:
             raise ValidationError("Quantity cannot be negative")
         if unit_type not in ALLOWED_UNITS:
             raise ValidationError("Invalid unit")
@@ -313,7 +320,7 @@ class InventoryService:
         cost_price = validate_price(cost_price, "Cost price")
         selling_price = validate_price(selling_price, "Selling price")
         reorder_level = float(reorder_level)
-        if reorder_level < 0:
+        if not math.isfinite(reorder_level) or reorder_level < 0:
             raise ValidationError("Reorder level cannot be negative")
         if unit_type in DISCRETE_UNITS and not reorder_level.is_integer():
             raise ValidationError(f"{unit_type} reorder levels must be whole numbers")
@@ -364,9 +371,13 @@ class InventoryService:
         if "selling_price" in changes: changes["selling_price"] = validate_price(changes["selling_price"], "Selling price")
         if "reorder_level" in changes:
             changes["reorder_level"] = float(changes["reorder_level"])
-            if changes["reorder_level"] < 0: raise ValidationError("Reorder level cannot be negative")
+            if not math.isfinite(changes["reorder_level"]) or changes["reorder_level"] < 0: raise ValidationError("Reorder level must be finite and nonnegative")
             if unit in DISCRETE_UNITS and not changes["reorder_level"].is_integer(): raise ValidationError(f"{unit} reorder level must be whole")
         if "name" in changes: changes["name"] = str(changes["name"]).strip()
+        if not changes.get("name", current["name"]):
+            raise ValidationError("Item name is required")
+        if unit != current["unit_type"]:
+            raise ValidationError("Unit changes require a stock conversion workflow; create a new item instead")
         fields = ", ".join(f"{k}=?" for k in changes)
         with transaction() as conn:
             try:
@@ -401,6 +412,7 @@ class ReportService:
             return [dict(r) for r in conn.execute("SELECT a.*, u.username FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.timestamp DESC, a.id DESC")]
 
     def write_csv(self, rows: list[dict[str, Any]], prefix: str) -> Path:
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
         path = REPORT_DIR / f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         if not rows:
             path.write_text("No records\n", encoding="utf-8")
@@ -414,14 +426,14 @@ class ReportService:
 def seed_demo(user_id: int) -> int:
     service = InventoryService()
     products = [
-        ("Fresh Fish", "Fresh", "kg", 43.70, 48, 65, "Roberts Supplier", 10),
-        ("Chicken Pieces", "Fresh Meat", "kg", 28.50, 55, 72, "Roberts Supplier", 8),
-        ("Sausage", "Fresh Meat", "kg", 18.25, 60, 82, "Roberts Supplier", 5),
-        ("Smoked Fish", "Fish", "kg", 16.80, 75, 105, "Roberts Supplier", 5),
-        ("Game Meat - Impala", "Game Meat", "kg", 12.00, 90, 125, "Roberts Supplier", 4),
-        ("Game Meat - Buffalo", "Game Meat", "kg", 9.50, 85, 120, "Roberts Supplier", 3),
-        ("Dlite Cooking Oil", "Groceries", "bottle", 24, 30, 38, "Roberts Supplier", 6),
-        ("Cornflakes", "Groceries", "pack", 18, 42, 52, "Roberts Supplier", 5),
+        ("Fresh Fish", "Fresh", "kg", 43.70, 48, 65, "Demo Supplier", 10),
+        ("Chicken Pieces", "Fresh Meat", "kg", 28.50, 55, 72, "Demo Supplier", 8),
+        ("Sausage", "Fresh Meat", "kg", 18.25, 60, 82, "Demo Supplier", 5),
+        ("Smoked Fish", "Fish", "kg", 16.80, 75, 105, "Demo Supplier", 5),
+        ("Game Meat - Impala", "Game Meat", "kg", 12.00, 90, 125, "Demo Supplier", 4),
+        ("Game Meat - Buffalo", "Game Meat", "kg", 9.50, 85, 120, "Demo Supplier", 3),
+        ("Dlite Cooking Oil", "Groceries", "bottle", 24, 30, 38, "Demo Supplier", 6),
+        ("Cornflakes", "Groceries", "pack", 18, 42, 52, "Demo Supplier", 5),
     ]
     created = 0
     for p in products:
