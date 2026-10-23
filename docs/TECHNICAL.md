@@ -40,21 +40,41 @@ Reports go into the active data directory's `reports/` folder with a timestamped
 
 Passwords require at least eight characters. Usernames are stripped, limited to 50 characters and cannot contain whitespace. Hashes contain algorithm, rounds, random 16-byte salt and digest. `hmac.compare_digest` compares hashes. There is no login rate limiting or password recovery workflow. Audit rows are mutable by someone with database access and are not tamper-proof.
 
-## Confirmed defects and remaining limitations
+## Web deployment and isolation
 
-1. Successful-login audit inserts use `db()` without a commit. They do not persist. Failed logins are not audited.
-2. Numeric validation does not reject all non-finite values. Positive infinity passes price validation. Validate with `math.isfinite` before real use.
-3. `require_role()` does not reject inactive users. Authentication checks activity, but an existing session/direct service call does not recheck it.
-4. Unit changes do not fully validate existing fractional quantities against discrete units. The update service also permits empty names after stripping.
-5. CLI `--seed-demo` selects the first username-sorted existing user without authenticating the caller. Use the authenticated admin menu instead.
-6. Backup/restore is not implemented; a created directory is not a backup. Stop the app before an ordinary database-file copy, or use SQLite's backup API in a future feature.
-7. Amounts and prices use binary floating point. Monetary precision, concurrent-user races, migrations, session lifecycle and recovery require further work.
-8. The first-admin precheck is outside its write transaction. Simultaneous first-run processes are not handled robustly.
+`app.py` exports a Flask application for Vercel. JSON snapshots contain only
+items, stock movements and audit rows. A `ContextVar` binds a separate in-memory
+SQLite connection to each request; no request changes the CLI database path.
+Users/password hashes are not exported. A synthetic actor is created per request.
+Server-side validation rejects malformed backups, non-finite inputs, fractional
+discrete stock, overdrawn stock and over-limit snapshots. Templates escape user
+text before HTML insertion. CSV exports neutralise formula-like text cells.
+
+Browser localStorage is the persistence layer for this portfolio demo. The
+server is stateless; there is no account, shared inventory, or cloud database.
+JSON backup/restore preserves the synthetic workspace across devices manually.
+All imported records are untrusted, editable demonstration data. Limits are
+100 items, 500 movements, 1,000 audits and 1 MB per API request.
+
+## Confirmed fixes and remaining limitations
+
+Fixed in the web deployment update: login audit writes now commit; numeric
+validation rejects NaN/infinity; inactive actors fail role checks; blank product
+names are rejected; unit changes are blocked until a conversion workflow exists.
+Import no longer creates directories (important for read-only deployments).
+
+The CLI still has these limitations: `--seed-demo` selects an existing user
+without authentication; first-admin setup can race between processes; automatic
+database backup/restore is not implemented. Prices use binary floats. Read
+repositories do not enforce roles. CSV report filenames can collide within one
+second. Existing v4 data is not migrated. The web demo does not expose CLI user
+management or offer cloud persistence. Neither interface is a complete POS or
+accounting system; movement values are at cost, not revenue or profit.
 
 ## Verification on the supplied source
 
-Executed against a temporary copy and temporary database, with no shop data: first-admin creation; staff creation; case-insensitive login; fractional kilogram removal; rejection of insufficient stock with original quantity retained; staff add-item rejection. Confirmed the missing login-audit commit and accepted infinite price. These were logic checks, not a production security audit or manual terminal usability assessment.
+Executed against a temporary copy and temporary database, with no shop data: first-admin creation; staff creation; case-insensitive login; fractional kilogram removal; rejection of insufficient stock with original quantity retained; staff add-item rejection. Those two defects were subsequently fixed and are covered by regression checks. These were logic checks, not a production security audit or manual terminal usability assessment.
 
 ## Repository hygiene
 
-Publish source and synthetic examples only. Do not commit `data/`, SQLite files, reports, backups, environment files or credentials. Never run `git add .` before inspecting staged filenames. Source import creates the data directories, so tests should use a temporary copy.
+Publish source and synthetic examples only. Do not commit `data/`, SQLite files, reports, backups, environment files or credentials. Never run `git add .` before inspecting staged filenames. Source import no longer creates data directories; CLI database/report paths are created when needed.
