@@ -61,8 +61,8 @@ class StoreTests(unittest.TestCase):
         self.login()
         self.assertEqual(self.add().status_code, 200)
         item = self.post('load').json['items'][0]
-        self.assertEqual(self.post('stock', {'item_id':item['id'], 'amount':1.25, 'direction':'remove'}).status_code, 200)
-        self.assertEqual(self.post('stock', {'item_id':item['id'], 'amount':100, 'direction':'remove'}).status_code, 400)
+        self.assertEqual(self.post('stock', {'item_id':item['id'], 'amount':1.25, 'direction':'remove', 'note':'Documented adjustment'}).status_code, 200)
+        self.assertEqual(self.post('stock', {'item_id':item['id'], 'amount':100, 'direction':'remove', 'note':'Rejected overdraw'}).status_code, 400)
         restarted = create_app(self.root).test_client()
         self.login(restarted)
         self.assertEqual(self.post('load', client=restarted).json['items'][0]['quantity'], 8.75)
@@ -81,7 +81,7 @@ class StoreTests(unittest.TestCase):
         self.login(staff, 'cashier', 'staff-password-123')
         item = self.post('load', client=staff).json['items'][0]
         self.assertEqual(self.post('add', {'name':'Chicken'}, client=staff).status_code, 403)
-        self.assertEqual(self.post('stock', {'item_id':item['id'],'amount':.5,'direction':'remove'}, client=staff).status_code, 200)
+        self.assertEqual(self.post('stock', {'item_id':item['id'],'amount':.5,'direction':'remove'}, client=staff).status_code, 403)
         self.assertEqual(staff.get('/backup').status_code, 403)
         self.assertEqual(self.post('reset').status_code, 400)
         self.assertEqual(self.post('load', snapshot={'version':1}).status_code, 400)
@@ -95,7 +95,7 @@ class StoreTests(unittest.TestCase):
         r = self.client.post('/account', data={'csrf':csrf, 'current':'owner-password-123', 'password':'new-password-123'})
         self.assertEqual(r.status_code, 302)
         self.assertEqual(self.post('load', client=second).status_code, 401)
-        for _ in range(10):
+        for _ in range(11):
             r = self.login(password='wrong')
         self.assertEqual(r.status_code, 429)
 

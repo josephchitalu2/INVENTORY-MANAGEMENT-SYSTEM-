@@ -1,5 +1,7 @@
 """Single-PC IMS. Run with python store_app.py; never deploy this on Vercel."""
 import hashlib
+import csv
+import io
 import os
 from pathlib import Path
 import secrets
@@ -8,6 +10,7 @@ import time
 
 from flask import Flask, abort, g, jsonify, redirect, render_template, request, send_file, session
 import ims
+import papino
 
 
 def create_app(data_dir=None):
@@ -42,6 +45,7 @@ def create_app(data_dir=None):
                 token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), expires REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS login_attempts (timestamp REAL NOT NULL);
         ''')
+        papino.init(conn)
         conn.execute('PRAGMA journal_mode=WAL')
     finally:
         ims.REQUEST_DATABASE.reset(token)
@@ -112,6 +116,7 @@ def create_app(data_dir=None):
                 user = ims.AuthService().authenticate(request.form.get('username', ''), request.form.get('password', ''))
                 sid = secrets.token_hex(32)
                 with g.conn:
+                    g.conn.execute('DELETE FROM login_attempts')
                     g.conn.execute('DELETE FROM web_sessions WHERE expires<?', (time.time(),))
                     g.conn.execute('INSERT INTO web_sessions VALUES(?,?,?)',
                         (hashlib.sha256(sid.encode()).hexdigest(), user['id'], time.time()+1800))
@@ -133,7 +138,7 @@ def create_app(data_dir=None):
 
     @app.get('/')
     def home():
-        return render_template('store_index.html', user=g.user)
+        return render_template('papino.html', user=g.user)
 
     @app.get('/api/health')
     def health():
@@ -156,6 +161,9 @@ def create_app(data_dir=None):
                 cost_price=float(data.get('cost_price', 0)), selling_price=float(data.get('selling_price', 0)),
                 supplier=str(data.get('supplier', '')), reorder_level=float(data.get('reorder_level', 5)))
         elif action == 'stock':
+            ims.AuthService().require_role(uid, {'admin', 'manager'})
+            if not str(data.get('note', '')).strip():
+                raise ims.ValidationError('A stock adjustment reason is required.')
             service.adjust_stock(uid, int(data.get('item_id', 0)), float(data.get('amount', 0)),
                 str(data.get('direction', '')), str(data.get('note', '')))
         elif action == 'update':
@@ -164,6 +172,45 @@ def create_app(data_dir=None):
         elif action != 'load':
             return jsonify(error='This action is unavailable in the store edition.'), 400
         return jsonify(items=service.items.all(), movements=ims.ReportService().movements(), audit=[])
+
+    @app.get('/inventory')
+    def inventory_page():
+        return render_template('store_index.html', user=g.user)
+
+    @app.get('/api/pos')
+    def pos_state():
+        return jsonify(papino.POS(g.conn,g.user).state())
+
+    @app.post('/api/pos')
+    def pos_action():
+        body=request.get_json()
+        if not isinstance(body,dict) or not isinstance(body.get('data'),dict):
+            abort(400)
+        action=body.get('action')
+        if action not in {'open','start_close','count','confirm_cash','confirm_payment','review_shift','resolve_exception'}:
+            backup()
+        return jsonify(papino.POS(g.conn,g.user).act(action,body['data']))
+
+    @app.get('/receipt/<sale_id>')
+    def receipt(sale_id):
+        sale=g.conn.execute('SELECT s.*,u.username FROM pos_sales s JOIN users u ON u.id=s.user_id WHERE s.id=?',(sale_id,)).fetchone()
+        if not sale: abort(404)
+        lines=g.conn.execute('SELECT * FROM pos_lines WHERE sale_id=?',(sale_id,)).fetchall()
+        payments=g.conn.execute('SELECT * FROM pos_payments WHERE sale_id=? ORDER BY id',(sale_id,)).fetchall()
+        return render_template('papino_receipt.html',sale=sale,lines=lines,payments=payments,balance=papino.POS(g.conn,g.user).balance(sale))
+
+    @app.get('/report.csv')
+    def report_csv():
+        ims.AuthService().require_role(g.user['id'], {'admin','manager'})
+        output=io.StringIO()
+        writer=csv.writer(output)
+        writer.writerow(['record_type','record_id','time','data_json'])
+        for table in ('pos_shifts','pos_counts','pos_sales','pos_lines','pos_payments','pos_cash','pos_events'):
+            for row in g.conn.execute('SELECT * FROM '+table):
+                data=dict(row)
+                import json
+                writer.writerow([table,str(data.get('id','')),str(data.get('created',data.get('opened',''))),json.dumps(data,ensure_ascii=False)])
+        return send_file(io.BytesIO(output.getvalue().encode('utf-8-sig')),mimetype='text/csv',as_attachment=True,download_name='PAPINO-full-ledger.csv')
 
     @app.get('/backup')
     def download_backup():
