@@ -1,49 +1,68 @@
-# Inventory Managment System
+# Inventory Management System
 
-A Python CLI inventory application for a small retail shop, with SQLite persistence, weighted stock and role-based write operations. The supplied file identifies itself as **v5.0**; its upload filename was `ims_v5_1(1).py`. This package uses `ims.py` as the canonical entry point. Built through iterative development with AI assistance.
+A Python CLI inventory application for a small retail shop, with SQLite persistence, weighted stock, movement history and role-based write operations.
 
-## Run
+**Version:** 5.0 · **Runtime:** Python 3.10+ · **Dependencies:** standard library only · **Status:** local educational prototype
 
-Requires Python 3.10+ and its standard library. No pip packages are required.
+[Technical documentation](docs/TECHNICAL.md) · [Roadmap](docs/ROADMAP.md) · [Testing](docs/TESTING.md) · [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
+
+## Quick start
 
 ```bash
+git clone https://github.com/josephchitalu2/INVENTORY-MANAGEMENT-SYSTEM-.git
+cd INVENTORY-MANAGEMENT-SYSTEM-
 python3 ims.py
 ```
 
-First run creates a local database and asks you to create an administrator. No default password is provided. Type `q` at the login username prompt to exit.
+First run creates a local database and asks you to create an administrator. No default password is shipped. Type `q` at the login username prompt to exit. The CLI still displays its original shop-specific application title; `ims.py` is the canonical entry point.
+
+Use a separate database for practice:
 
 ```bash
-python3 ims.py --init-db
+python3 ims.py --init-db --db ./sandbox/inventory.db
 python3 ims.py --db ./sandbox/inventory.db
 ```
 
-After creating an admin, use menu 13 to add the eight fictional demo products. It is an admin-only menu operation. Existing duplicate product names are skipped.
+After signing in as admin, menu **13** adds eight fictional demo products. Duplicate product names are skipped. Use this authenticated menu rather than the legacy command-line seeding option documented under known issues.
 
 ## Capabilities
 
-- Units: kilograms, packs, bottles and pieces. Kilograms accept fractional quantities.
-- Item search, stock-in/out, low-stock lookup and inventory cost valuation.
-- Inventory and movement CSV reports.
-- Admin, manager and staff roles with service-level write restrictions.
-- Password hashing using salted PBKDF2-HMAC-SHA256, 210,000 rounds.
-- Atomic inventory changes with movement and audit inserts in a SQLite transaction.
+| Area | Working behaviour |
+| --- | --- |
+| Stock units | Fractional kilograms; whole packs, bottles and pieces |
+| Inventory | Item search, stock in/out, low-stock lookup and cost valuation |
+| Records | Stock movements and inventory/movement CSV reports |
+| Roles | Admin, manager and staff; service-level write restrictions |
+| Passwords | Salted PBKDF2-HMAC-SHA256 hashes, 210,000 rounds |
+| Writes | Inventory changes and their movement/audit inserts in SQLite transactions |
 
-[Technical documentation](docs/TECHNICAL.md) explains the schema, operation, limitations and validation results. **Read its known issues before entering real shop data.**
+Read the [confirmed defects](docs/TECHNICAL.md#confirmed-defects-and-remaining-limitations) before entering real shop data. This repository contains the CLI implementation; a separate Flask POS deployment is not included here.
 
-## Data handling
+## Code and data
 
-The program creates `data/inventory.db`, `data/reports/` and `data/backups/` beside the script. A custom `--db` changes these destinations. A backups folder exists, but automatic backup/restore is not implemented. CSV reports do not restore a database.
+| Path | Purpose |
+| --- | --- |
+| `ims.py` | CLI, services, repositories and SQLite schema |
+| `docs/TECHNICAL.md` | Architecture, permissions, data model and known issues |
+| `docs/ROADMAP.md` | Prioritised future work |
+| `docs/TESTING.md` | Reproducible checks and their limits |
+| `.github/` | Automated smoke check and contribution templates |
 
-Do not commit databases, password hashes, real customer/supplier details or exported logs. The included `.gitignore` excludes common runtime outputs. Check tracked files separately: ignore rules do not untrack existing content.
+By default the application creates `data/inventory.db`, `data/reports/` and `data/backups/` beside the script. `--db` changes the active data location; importing the script also creates its default data directories. Run verification on a temporary copy.
 
-## Project status
+A backups directory exists, but backup/restore is not implemented. CSV reports cannot restore a database. v4 databases are not migrated automatically: preserve the original separately and use a fresh v5 database.
 
-Educational/local prototype. This upload is preserved, with known defects documented rather than labelled production-ready. This update replaces the old v4 code stored in README.md with real documentation and a separate Python entry point. Earlier versions remain in Git history. No licence has been chosen in this package; choose one before claiming open-source licensing.
+## Development
 
-## Planned improvements
+```bash
+python3 -m py_compile ims.py
+python3 scripts/smoke_check.py
+```
 
-These are intentions, not existing capabilities: verified database backup/restore, stricter finite-number and unit validation, persistent login auditing, session/activity checks, safe demo seeding, database migrations, and a broader automated regression suite. See [the roadmap](docs/ROADMAP.md) for the proposed order.
+The smoke check runs an isolated copy, initialises SQLite and verifies its expected tables. It does not exercise all business rules or fix the known defects. No complete automated regression suite is currently shipped.
 
-## Existing v4 data
+Do not commit live databases, password hashes, reports or shop/customer data. `.gitignore` excludes runtime outputs, but already tracked files must still be reviewed.
 
-v5 does not migrate a v4 database. Start with a fresh database path and preserve the old database separately. Do not point this application at a v4 database expecting an automatic upgrade.
+## Licensing and provenance
+
+Built through iterative development with AI assistance. No software licence has been selected; public source visibility is not an open-source licence grant. Earlier versions remain in Git history. Future work is listed in the roadmap rather than presented as completed functionality.
