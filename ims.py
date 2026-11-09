@@ -12,6 +12,7 @@ import csv
 import hashlib
 import hmac
 import json
+import math
 import os
 import secrets
 import sqlite3
@@ -81,6 +82,8 @@ def validate_quantity(amount: float, unit: str) -> float:
         value = float(amount)
     except (TypeError, ValueError):
         raise ValidationError("Quantity must be a number")
+    if not math.isfinite(value):
+        raise ValidationError("Quantity must be finite")
     if value <= 0:
         raise ValidationError("Quantity must be greater than zero")
     if unit not in ALLOWED_UNITS:
@@ -95,6 +98,8 @@ def validate_price(value: float, field: str) -> float:
         result = float(value)
     except (TypeError, ValueError):
         raise ValidationError(f"{field} must be a number")
+    if not math.isfinite(result):
+        raise ValidationError(f"{field} must be finite")
     if result < 0:
         raise ValidationError(f"{field} cannot be negative")
     return result
@@ -256,7 +261,7 @@ class AuthService:
         user = self.users.find_by_username(username)
         if not user or not user["active"] or not verify_password(password, user["password_hash"]):
             raise AuthenticationError("Invalid username or password")
-        with db() as conn:
+        with transaction() as conn:
             conn.execute("INSERT INTO audit_log(user_id,action,table_name,record_id,new_values) VALUES(?,?,?,?,?)", (user["id"],"login","users",user["id"],json.dumps({"success":True})))
         user.pop("password_hash", None)
         return user
@@ -274,6 +279,8 @@ class AuthService:
         user = self.users.find(user_id)
         if not user:
             raise UserNotFoundError("User not found")
+        if not user["active"]:
+            raise AuthorizationError("Your account is inactive")
         if user["role"] not in allowed:
             raise AuthorizationError("You are not authorized to perform this operation")
         return user
@@ -303,7 +310,12 @@ class InventoryService:
         name = name.strip()
         if not name:
             raise ValidationError("Item name is required")
-        quantity = float(quantity)
+        try:
+            quantity = float(quantity)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("Quantity must be a number") from exc
+        if not math.isfinite(quantity):
+            raise ValidationError("Quantity must be finite")
         if quantity < 0:
             raise ValidationError("Quantity cannot be negative")
         if unit_type not in ALLOWED_UNITS:
@@ -312,7 +324,12 @@ class InventoryService:
             raise ValidationError(f"{unit_type} quantities must be whole numbers")
         cost_price = validate_price(cost_price, "Cost price")
         selling_price = validate_price(selling_price, "Selling price")
-        reorder_level = float(reorder_level)
+        try:
+            reorder_level = float(reorder_level)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("Reorder level must be a number") from exc
+        if not math.isfinite(reorder_level):
+            raise ValidationError("Reorder level must be finite")
         if reorder_level < 0:
             raise ValidationError("Reorder level cannot be negative")
         if unit_type in DISCRETE_UNITS and not reorder_level.is_integer():
@@ -363,10 +380,22 @@ class InventoryService:
         if "cost_price" in changes: changes["cost_price"] = validate_price(changes["cost_price"], "Cost price")
         if "selling_price" in changes: changes["selling_price"] = validate_price(changes["selling_price"], "Selling price")
         if "reorder_level" in changes:
-            changes["reorder_level"] = float(changes["reorder_level"])
+            try:
+                changes["reorder_level"] = float(changes["reorder_level"])
+            except (TypeError, ValueError) as exc:
+                raise ValidationError("Reorder level must be a number") from exc
+            if not math.isfinite(changes["reorder_level"]): raise ValidationError("Reorder level must be finite")
             if changes["reorder_level"] < 0: raise ValidationError("Reorder level cannot be negative")
             if unit in DISCRETE_UNITS and not changes["reorder_level"].is_integer(): raise ValidationError(f"{unit} reorder level must be whole")
-        if "name" in changes: changes["name"] = str(changes["name"]).strip()
+        if "name" in changes:
+            changes["name"] = str(changes["name"]).strip()
+            if not changes["name"]:
+                raise ValidationError("Item name is required")
+        if unit in DISCRETE_UNITS:
+            if not float(current["quantity"]).is_integer():
+                raise ValidationError("Cannot use a whole-item unit with fractional stock")
+            if not float(changes.get("reorder_level", current["reorder_level"])).is_integer():
+                raise ValidationError("Cannot use a whole-item unit with a fractional reorder level")
         fields = ", ".join(f"{k}=?" for k in changes)
         with transaction() as conn:
             try:
@@ -543,10 +572,7 @@ def main() -> None:
     init_database()
     if args.init_db: print(f"Database ready: {DATABASE_PATH}"); return
     if args.seed_demo:
-        auth=AuthService()
-        if auth.users.count()==0: raise SystemExit("Create an administrator first, then run --seed-demo.")
-        uid=auth.users.all()[0]["id"]
-        print(f"Seeded {seed_demo(uid)} demo items."); return
+        raise SystemExit("Unauthenticated --seed-demo is disabled. Sign in as admin and use menu 13.")
     run_cli()
 
 
