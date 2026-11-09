@@ -57,9 +57,10 @@ A backups directory exists, but backup/restore is not implemented. CSV reports c
 ```bash
 python3 -m py_compile ims.py
 python3 scripts/smoke_check.py
+python3 -m unittest discover -s tests -v
 ```
 
-The smoke check runs an isolated copy, initialises SQLite and verifies its expected tables. It does not exercise all business rules or fix the known defects. No complete automated regression suite is currently shipped.
+The smoke check runs an isolated copy, initialises SQLite and verifies its expected tables. It does not exercise all business rules or fix the known defects. A focused security and inventory regression suite is available on the CLI fix branch; it is not a full integration or recovery test.
 
 Do not commit live databases, password hashes, reports or shop/customer data. `.gitignore` excludes runtime outputs, but already tracked files must still be reviewed.
 

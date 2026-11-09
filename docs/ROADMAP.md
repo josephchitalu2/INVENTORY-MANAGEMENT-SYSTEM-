@@ -4,6 +4,8 @@ The current code remains the supplied v5.0 prototype. This roadmap describes pro
 
 ## First: correctness and access controls
 
+The CLI guard and regression branch addresses login audit persistence, finite numeric validation, inactive role checks, discrete-unit changes, blank item names and unauthenticated demo seeding. Those items remain pending until the branch is tested and merged. Failed-login auditing and broader input/session hardening remain future work.
+
 - Commit successful-login audit entries and define failed-login logging.
 - Reject NaN/infinity for all numeric inputs and define money precision.
 - Recheck account activity during service operations.
