@@ -40,20 +40,24 @@ Reports go into the active data directory's `reports/` folder with a timestamped
 
 Passwords require at least eight characters. Usernames are stripped, limited to 50 characters and cannot contain whitespace. Hashes contain algorithm, rounds, random 16-byte salt and digest. `hmac.compare_digest` compares hashes. There is no login rate limiting or password recovery workflow. Audit rows are mutable by someone with database access and are not tamper-proof.
 
+## Security and correctness fixes (fix/cli-guards-and-regression-tests)
+
+The regression branch commits successful-login audit rows, rejects non-finite numbers in quantities/prices/reorder thresholds, checks active status for role-restricted operations, rejects blank item names and fractional stock/reorder values when converting to whole-item units, and disables the unauthenticated command-line demo seeding shortcut. Use the authenticated admin menu 13 to seed fictional items. These controls have regression tests; until the branch is merged they are not on main.
+
 ## Confirmed defects and remaining limitations
 
-1. Successful-login audit inserts use `db()` without a commit. They do not persist. Failed logins are not audited.
-2. Numeric validation does not reject all non-finite values. Positive infinity passes price validation. Validate with `math.isfinite` before real use.
-3. `require_role()` does not reject inactive users. Authentication checks activity, but an existing session/direct service call does not recheck it.
-4. Unit changes do not fully validate existing fractional quantities against discrete units. The update service also permits empty names after stripping.
-5. CLI `--seed-demo` selects the first username-sorted existing user without authenticating the caller. Use the authenticated admin menu instead.
+1. On `main`, successful-login audit inserts did not persist; fixed on the regression branch. Failed logins are still not audited.
+2. On `main`, non-finite numeric values were not rejected; fixed on the regression branch. Monetary precision still requires design work.
+3. On `main`, `require_role()` did not reject inactive users; fixed on the regression branch for role-guarded operations.
+4. On `main`, unit changes permitted fractional stock under discrete units and stripped empty names; fixed on the regression branch.
+5. On `main`, CLI `--seed-demo` could seed without authentication; disabled on the regression branch. Use the authenticated admin menu instead.
 6. Backup/restore is not implemented; a created directory is not a backup. Stop the app before an ordinary database-file copy, or use SQLite's backup API in a future feature.
 7. Amounts and prices use binary floating point. Monetary precision, concurrent-user races, migrations, session lifecycle and recovery require further work.
 8. The first-admin precheck is outside its write transaction. Simultaneous first-run processes are not handled robustly.
 
 ## Verification on the supplied source
 
-Executed against a temporary copy and temporary database, with no shop data: first-admin creation; staff creation; case-insensitive login; fractional kilogram removal; rejection of insufficient stock with original quantity retained; staff add-item rejection. Confirmed the missing login-audit commit and accepted infinite price. These were logic checks, not a production security audit or manual terminal usability assessment.
+Executed against a temporary copy and temporary database, with no shop data: first-admin creation; staff creation; case-insensitive login; fractional kilogram removal; rejection of insufficient stock with original quantity retained; staff add-item rejection. The baseline checks confirmed the missing login-audit commit and accepted infinite price; regression tests on the fix branch cover these cases. These are logic checks, not a production security audit or manual terminal usability assessment.
 
 ## Repository hygiene
 
