@@ -14,7 +14,7 @@ cd INVENTORY-MANAGEMENT-SYSTEM-
 python3 ims.py
 ```
 
-First run creates a local database and asks you to create an administrator. No default password is shipped. Type `q` at the login username prompt to exit. The CLI still displays its original shop-specific application title; `ims.py` is the canonical entry point.
+First run creates a local database and asks you to create an administrator. No default password is shipped. Type `q` at the login username prompt to exit. The CLI uses Chitalu Software Solutions branding; `ims.py` is the canonical entry point.
 
 Use a separate database for practice:
 
@@ -60,7 +60,7 @@ python3 scripts/smoke_check.py
 python3 -m unittest discover -s tests -v
 ```
 
-The smoke check runs an isolated copy, initialises SQLite and verifies its expected tables. It does not exercise all business rules or fix the known defects. A focused security and inventory regression suite is available on the CLI fix branch; it is not a full integration or recovery test.
+The smoke check runs an isolated copy, initialises SQLite and verifies its expected tables. It does not exercise all business rules or fix the known defects. The focused security and inventory regression suite is on `main`; it is not a full integration or recovery test.
 
 Do not commit live databases, password hashes, reports or shop/customer data. `.gitignore` excludes runtime outputs, but already tracked files must still be reviewed.
 

@@ -1,29 +1,24 @@
 # IMS roadmap
 
-The current code remains the supplied v5.0 prototype. This roadmap describes proposed future work, not implemented features or committed delivery dates.
+The v5.0 CLI has implemented inventory and authentication behavior; a separate Flask web-deployment proposal remains open in PR #3. This roadmap describes future work, not committed delivery dates.
 
-## First: correctness and access controls
+## Completed correctness work
 
-The CLI guard and regression branch addresses login audit persistence, finite numeric validation, inactive role checks, discrete-unit changes, blank item names and unauthenticated demo seeding. Those items remain pending until the branch is tested and merged. Failed-login auditing and broader input/session hardening remain future work.
+Current main persists successful-login audit entries, rejects non-finite numeric inputs, rejects inactive actors for protected operations, validates discrete-unit changes and item names, and disables unauthenticated CLI demo seeding. Eight focused regression tests cover these behaviors.
 
-- Commit successful-login audit entries and define failed-login logging.
-- Reject NaN/infinity for all numeric inputs and define money precision.
-- Recheck account activity during service operations.
-- Validate unit changes against current quantity and reject empty renamed items.
-- Replace unauthenticated command-line demo seeding with an explicitly authorised workflow.
-- Add regression tests for these issues and concurrent first-admin creation.
+## Next correctness and recovery work
 
-## Next: recovery and data evolution
+- Define exact money precision and failed-login logging.
+- Add login-rate and session/recovery policies as the interface develops.
+- Test concurrent writes and simultaneous first-admin creation.
+- Provide verified SQLite backup creation and a restore workflow.
+- Add schema versioning and migrations; preserve originals when upgrading.
+- Define item archiving, audit formats and unique report filenames.
 
-- Provide consistent SQLite backup creation with verification and a tested restore workflow.
-- Add explicit schema versioning and migration tooling. v4 and v5 schemas are not automatically compatible.
-- Add item archiving without losing historical movements.
-- Avoid report filename collisions and define an audit value format.
+## Business requirements
 
-## Later: business requirements
+Validate actual shop units, stock reconciliation and reporting needs. Design sales, returns, credit and payment records before presenting the CLI as a complete POS/accounting product. Business Automation is a separate application design that can build on these lessons.
 
-- Validate real shop units, supplier fields, stock reconciliation and reporting needs with the owner.
-- Consider POS/sales integration only after designing sales, returns and accounting records.
-- Evaluate a graphical interface and multi-user operation after measuring workflow needs.
+## Deployment work
 
-Any claim of enterprise or production readiness needs deployment evidence, recovery tests, access-control testing and operational support. The current README intentionally makes no such claim.
+The web-deployment PR is a separate pending change. This documentation cleanup does not merge it or change Vercel production. Verify deployment and runtime access before marking that work complete.
