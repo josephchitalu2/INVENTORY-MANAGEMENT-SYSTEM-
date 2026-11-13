@@ -32,7 +32,7 @@ Old/new audit values are generally JSON text, but the password-change entry stor
 
 ## Typical workflow
 
-Create admin, log in, create items or seed demo, record movements, inspect low stock and export reports. Menu 6 keeps blank fields unchanged. Menu 10 changes your password. Stock-out values use the item's cost price, not sales revenue. The application is not a complete POS/accounting system.
+Follow the [operator guide](OPERATOR_GUIDE.md) to create an admin, seed demo items, record movements, inspect low stock and export reports. Menu 6 keeps blank fields unchanged. Menu 10 changes your password. Stock-out values use the item's cost price, not sales revenue. The application is not a complete POS/accounting system.
 
 Reports go into the active data directory's `reports/` folder with a timestamped name. An empty report contains `No records`. Same-prefix exports within one second can overwrite each other.
 

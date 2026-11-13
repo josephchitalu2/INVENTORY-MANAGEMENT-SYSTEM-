@@ -1,6 +1,6 @@
 # IMS roadmap
 
-The v5.0 CLI has implemented inventory and authentication behavior; a separate Flask web-deployment proposal remains open in PR #3. This roadmap describes future work, not committed delivery dates.
+The v5.0 CLI has implemented inventory and authentication behavior; a separate [Flask web demo proposal](https://github.com/josephchitalu2/INVENTORY-MANAGEMENT-SYSTEM-/pull/3) remains open. This roadmap describes future work, not committed delivery dates.
 
 ## Completed correctness work
 
@@ -21,4 +21,4 @@ Validate actual shop units, stock reconciliation and reporting needs. Design sal
 
 ## Deployment work
 
-The web-deployment PR is a separate pending change. This documentation cleanup does not merge it or change Vercel production. Verify deployment and runtime access before marking that work complete.
+Before deploying a web version, verify the build, runtime access and where data persists. The local CLI remains the supported entry point in this repository.

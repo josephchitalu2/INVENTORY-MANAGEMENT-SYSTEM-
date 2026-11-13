@@ -4,7 +4,7 @@ A Python CLI inventory application for a small retail shop, with SQLite persiste
 
 **Version:** 5.0 · **Runtime:** Python 3.10+ · **Dependencies:** standard library only · **Status:** local educational prototype
 
-[Technical documentation](docs/TECHNICAL.md) · [Roadmap](docs/ROADMAP.md) · [Testing](docs/TESTING.md) · [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
+[Operator guide](docs/OPERATOR_GUIDE.md) · [Technical documentation](docs/TECHNICAL.md) · [Roadmap](docs/ROADMAP.md) · [Testing](docs/TESTING.md) · [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
 
 ## Quick start
 
@@ -14,7 +14,7 @@ cd INVENTORY-MANAGEMENT-SYSTEM-
 python3 ims.py
 ```
 
-First run creates a local database and asks you to create an administrator. No default password is shipped. Type `q` at the login username prompt to exit. The CLI uses Chitalu Software Solutions branding; `ims.py` is the canonical entry point.
+First run creates a local SQLite database and asks you to create an administrator. Choose a new password with at least eight characters. No default password is shipped. Type `q` at the login username prompt to exit. The CLI uses Chitalu Software Solutions branding; `ims.py` is the canonical entry point.
 
 Use a separate database for practice:
 
@@ -23,7 +23,7 @@ python3 ims.py --init-db --db ./sandbox/inventory.db
 python3 ims.py --db ./sandbox/inventory.db
 ```
 
-After signing in as admin, menu **13** adds eight fictional demo products. Duplicate product names are skipped. Use this authenticated menu rather than the legacy command-line seeding option documented under known issues.
+After signing in as admin, menu **13** adds eight fictional demo products. Duplicate product names are skipped. The legacy `--seed-demo` argument is disabled. The [operator guide](docs/OPERATOR_GUIDE.md) shows the first stock movement and report export.
 
 ## Capabilities
 
@@ -36,13 +36,14 @@ After signing in as admin, menu **13** adds eight fictional demo products. Dupli
 | Passwords | Salted PBKDF2-HMAC-SHA256 hashes, 210,000 rounds |
 | Writes | Inventory changes and their movement/audit inserts in SQLite transactions |
 
-Read the [confirmed defects](docs/TECHNICAL.md#confirmed-defects-and-remaining-limitations) before entering real shop data. This repository contains the CLI implementation; a separate Flask POS deployment is not included here.
+Review the [remaining limitations](docs/TECHNICAL.md#confirmed-defects-and-remaining-limitations) before entering real shop data. The [Flask inventory demo](https://github.com/josephchitalu2/INVENTORY-MANAGEMENT-SYSTEM-/pull/3) is a separate proposal.
 
 ## Code and data
 
 | Path | Purpose |
 | --- | --- |
 | `ims.py` | CLI, services, repositories and SQLite schema |
+| `docs/OPERATOR_GUIDE.md` | Practice setup, stock movements and reports |
 | `docs/TECHNICAL.md` | Architecture, permissions, data model and known issues |
 | `docs/ROADMAP.md` | Prioritised future work |
 | `docs/TESTING.md` | Reproducible checks and their limits |
