@@ -2,9 +2,22 @@
 
 ## Architecture
 
-The application is one Python file with separate responsibilities: CLI functions collect input; `AuthService`, `InventoryService` and `ReportService` handle operations; `UserRepository` and `ItemRepository` provide reads. Service writes use parameterised SQL directly. This is logical separation within a single file, not separate deployable modules.
+The CLI and inventory engine live in `ims.py`. CLI functions collect input, services handle operations, and repositories provide reads. Service writes use parameterised SQL. The Flask demo in `app.py` calls the same inventory engine.
 
 `db()` opens SQLite with foreign keys enabled and a 10-second busy timeout, then closes the connection. `transaction()` explicitly begins, commits on success and rolls back on exceptions. Plain `db()` does not commit writes automatically.
+
+## Browser workspace
+
+The browser sends a JSON snapshot of its items, movements and audit rows with
+each request. Flask binds a separate in-memory SQLite connection to that
+request through a `ContextVar`. The services read and write that connection
+until the request finishes. The browser saves the returned snapshot in
+`localStorage`. CLI commands open the configured disk database.
+
+The request snapshot contains editable demo data. The server creates a fictional
+actor for each request. User records and password hashes stay outside the
+snapshot. The demo accepts up to 100 items, 500 movements, 1,000 audit rows, and
+1 MB per request. JSON backup exports contain the browser workspace.
 
 ## Schema
 
@@ -58,8 +71,13 @@ Stop the app before an ordinary database-file copy. A future backup workflow sho
 
 ## Verification on current main
 
-On 10 November 2026, the isolated database/schema smoke check and eight regression tests passed against the current source. Coverage includes login audit persistence, inactive accounts, invalid numeric inputs, discrete quantities, rejected deductions, unit conversions and item names. Tests use temporary data, not shop records. This is focused automated verification; it does not establish concurrency, recovery or full production readiness.
+The CLI smoke check verifies the schema in a temporary database. The regression
+suites cover login auditing, permissions, input validation, stock operations,
+browser backup restore and concurrent requests with separate demo workspaces.
+Run the commands in the [verification guide](TESTING.md).
 
 ## Repository hygiene
 
-Publish source and synthetic examples only. Do not commit `data/`, SQLite files, reports, backups, environment files or credentials. Never run `git add .` before inspecting staged filenames. Source import creates the data directories, so tests should use a temporary copy.
+Publish source and synthetic examples only. Keep `data/`, SQLite files, reports,
+backups, environment files and credentials outside source control. The CLI
+creates its directories when run. Importing the Flask app performs no disk writes.

@@ -1,11 +1,11 @@
 # IMS verification
 
-Requires Python 3.10+ and its standard library. Run from the repository root:
+Run the CLI checks from the repository root with Python 3.10+.
 
 ```bash
 python3 -m py_compile ims.py
 python3 scripts/smoke_check.py
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -p test_inventory_guards.py -v
 ```
 
 The smoke check copies `ims.py` into a temporary directory, runs `--init-db` with a temporary database path, checks SQLite integrity and confirms the four expected tables. Temporary runtime files are removed afterward. It does not modify the shop database.
@@ -13,6 +13,13 @@ The smoke check copies `ims.py` into a temporary directory, runs `--init-db` wit
 ## Automated regression coverage
 
 The standard-library unittest suite uses a temporary SQLite database and tests persisted successful-login auditing, disabled-account authorization, invalid non-finite numbers, discrete-unit constraints, rejected stock deductions, unit changes and item name validation. GitHub Actions runs these checks on pushes and pull requests. They do not establish production readiness or replace a real browser/terminal demonstration.
+
+## Flask demo checks
+
+Use the [demo setup](../README.md#browser-demo) to install Flask, then run
+`.venv/bin/python -m unittest discover -s tests -v`. The web suite also runs in
+GitHub Actions. It checks the Flask health route, product edits, weighted stock
+movements, backup validation, rollback and isolated visitor workspaces.
 
 ## Manual functional checks
 

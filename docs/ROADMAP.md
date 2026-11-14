@@ -1,6 +1,6 @@
 # IMS roadmap
 
-The v5.0 CLI has implemented inventory and authentication behavior; a separate [Flask web demo proposal](https://github.com/josephchitalu2/INVENTORY-MANAGEMENT-SYSTEM-/pull/3) remains open. This roadmap describes future work, not committed delivery dates.
+The v5.0 CLI manages inventory with local authentication. The [Flask demo](../README.md#browser-demo) uses a browser-local workspace with fictional data.
 
 ## Completed correctness work
 
@@ -21,4 +21,6 @@ Validate actual shop units, stock reconciliation and reporting needs. Design sal
 
 ## Deployment work
 
-Before deploying a web version, verify the build, runtime access and where data persists. The local CLI remains the supported entry point in this repository.
+For a shared web edition, define authenticated staff access, durable storage and
+backup recovery before a pilot. Verify the deployment and run the store workflow
+against the proposed database.

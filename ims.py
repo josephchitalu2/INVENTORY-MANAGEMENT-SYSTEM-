@@ -18,6 +18,7 @@ import secrets
 import sqlite3
 import sys
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from getpass import getpass
@@ -36,8 +37,8 @@ ALLOWED_UNITS = {"kg", "pack", "bottle", "piece"}
 DISCRETE_UNITS = {"pack", "bottle", "piece"}
 ROLES = {"admin", "manager", "staff"}
 
-for directory in (DATA_DIR, BACKUP_DIR, REPORT_DIR):
-    directory.mkdir(parents=True, exist_ok=True)
+# A Flask request can lend its private SQLite connection to the IMS services.
+REQUEST_DATABASE: ContextVar[sqlite3.Connection | None] = ContextVar("request_database", default=None)
 
 
 class IMSException(Exception): pass
@@ -107,8 +108,13 @@ def validate_price(value: float, field: str) -> float:
 
 @contextmanager
 def db() -> Iterator[sqlite3.Connection]:
+    scoped = REQUEST_DATABASE.get()
+    if scoped is not None:
+        yield scoped
+        return
     conn = None
     try:
+        DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(DATABASE_PATH), timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -430,6 +436,7 @@ class ReportService:
             return [dict(r) for r in conn.execute("SELECT a.*, u.username FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.timestamp DESC, a.id DESC")]
 
     def write_csv(self, rows: list[dict[str, Any]], prefix: str) -> Path:
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
         path = REPORT_DIR / f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         if not rows:
             path.write_text("No records\n", encoding="utf-8")
@@ -568,7 +575,8 @@ def main() -> None:
     if args.db:
         DATABASE_PATH=Path(args.db).expanduser().resolve()
         DATA_DIR=DATABASE_PATH.parent; BACKUP_DIR=DATA_DIR/"backups"; REPORT_DIR=DATA_DIR/"reports"
-        for d in (DATA_DIR,BACKUP_DIR,REPORT_DIR): d.mkdir(parents=True,exist_ok=True)
+    for directory in (DATA_DIR, BACKUP_DIR, REPORT_DIR):
+        directory.mkdir(parents=True, exist_ok=True)
     init_database()
     if args.init_db: print(f"Database ready: {DATABASE_PATH}"); return
     if args.seed_demo:
