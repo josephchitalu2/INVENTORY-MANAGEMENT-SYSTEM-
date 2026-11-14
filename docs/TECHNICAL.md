@@ -2,9 +2,22 @@
 
 ## Architecture
 
-The application is one Python file with separate responsibilities: CLI functions collect input; `AuthService`, `InventoryService` and `ReportService` handle operations; `UserRepository` and `ItemRepository` provide reads. Service writes use parameterised SQL directly. This is logical separation within a single file, not separate deployable modules.
+The CLI and inventory engine live in `ims.py`. CLI functions collect input, services handle operations, and repositories provide reads. Service writes use parameterised SQL. The Flask demo in `app.py` calls the same inventory engine.
 
 `db()` opens SQLite with foreign keys enabled and a 10-second busy timeout, then closes the connection. `transaction()` explicitly begins, commits on success and rolls back on exceptions. Plain `db()` does not commit writes automatically.
+
+## Browser workspace
+
+The browser sends a JSON snapshot of its items, movements and audit rows with
+each request. Flask binds a separate in-memory SQLite connection to that
+request through a `ContextVar`. The services read and write that connection
+until the request finishes. The browser saves the returned snapshot in
+`localStorage`. CLI commands open the configured disk database.
+
+The request snapshot contains editable demo data. The server creates a fictional
+actor for each request. User records and password hashes stay outside the
+snapshot. The demo accepts up to 100 items, 500 movements, 1,000 audit rows, and
+1 MB per request. JSON backup exports contain the browser workspace.
 
 ## Schema
 
@@ -32,7 +45,7 @@ Old/new audit values are generally JSON text, but the password-change entry stor
 
 ## Typical workflow
 
-Create admin, log in, create items or seed demo, record movements, inspect low stock and export reports. Menu 6 keeps blank fields unchanged. Menu 10 changes your password. Stock-out values use the item's cost price, not sales revenue. The application is not a complete POS/accounting system.
+Follow the [operator guide](OPERATOR_GUIDE.md) to create an admin, seed demo items, record movements, inspect low stock and export reports. Menu 6 keeps blank fields unchanged. Menu 10 changes your password. Stock-out values use the item's cost price, not sales revenue. The application is not a complete POS/accounting system.
 
 Reports go into the active data directory's `reports/` folder with a timestamped name. An empty report contains `No records`. Same-prefix exports within one second can overwrite each other.
 
@@ -40,41 +53,31 @@ Reports go into the active data directory's `reports/` folder with a timestamped
 
 Passwords require at least eight characters. Usernames are stripped, limited to 50 characters and cannot contain whitespace. Hashes contain algorithm, rounds, random 16-byte salt and digest. `hmac.compare_digest` compares hashes. There is no login rate limiting or password recovery workflow. Audit rows are mutable by someone with database access and are not tamper-proof.
 
-## Web deployment and isolation
+## Security and correctness fixes on main
 
-`app.py` exports a Flask application for Vercel. JSON snapshots contain only
-items, stock movements and audit rows. A `ContextVar` binds a separate in-memory
-SQLite connection to each request; no request changes the CLI database path.
-Users/password hashes are not exported. A synthetic actor is created per request.
-Server-side validation rejects malformed backups, non-finite inputs, fractional
-discrete stock, overdrawn stock and over-limit snapshots. Templates escape user
-text before HTML insertion. CSV exports neutralise formula-like text cells.
+The current main branch persists successful-login audit rows, rejects non-finite quantities/prices/reorder thresholds, checks active status for role-restricted operations, rejects blank item names and fractional stock/reorder values when converting to whole-item units, and disables unauthenticated command-line demo seeding. Use authenticated admin menu 13 for fictional products. These fixes have focused regression coverage.
 
-Browser localStorage is the persistence layer for this portfolio demo. The
-server is stateless; there is no account, shared inventory, or cloud database.
-JSON backup/restore preserves the synthetic workspace across devices manually.
-All imported records are untrusted, editable demonstration data. Limits are
-100 items, 500 movements, 1,000 audits and 1 MB per API request.
+## Confirmed defects and remaining limitations
 
-## Confirmed fixes and remaining limitations
+1. Failed logins are not audited; login rate limiting and recovery are not implemented.
+2. Monetary fields use binary floating point and require an explicit precision design.
+3. Backup/restore is not implemented. A created directory is not a backup; CSV exports cannot restore the database.
+4. Concurrent-user races, migrations, session lifecycle and concurrent first-admin creation require further work.
+5. The first-admin precheck occurs outside its write transaction.
+6. Audit records can be modified by someone with database access and are not tamper-proof.
+7. Report filenames can collide within one second; audit values do not have one consistent serialization format.
 
-Fixed in the web deployment update: login audit writes now commit; numeric
-validation rejects NaN/infinity; inactive actors fail role checks; blank product
-names are rejected; unit changes are blocked until a conversion workflow exists.
-Import no longer creates directories (important for read-only deployments).
+Stop the app before an ordinary database-file copy. A future backup workflow should use SQLite's backup API and validate restoration.
 
-The CLI still has these limitations: `--seed-demo` selects an existing user
-without authentication; first-admin setup can race between processes; automatic
-database backup/restore is not implemented. Prices use binary floats. Read
-repositories do not enforce roles. CSV report filenames can collide within one
-second. Existing v4 data is not migrated. The web demo does not expose CLI user
-management or offer cloud persistence. Neither interface is a complete POS or
-accounting system; movement values are at cost, not revenue or profit.
+## Verification on current main
 
-## Verification on the supplied source
-
-Executed against a temporary copy and temporary database, with no shop data: first-admin creation; staff creation; case-insensitive login; fractional kilogram removal; rejection of insufficient stock with original quantity retained; staff add-item rejection. Those two defects were subsequently fixed and are covered by regression checks. These were logic checks, not a production security audit or manual terminal usability assessment.
+The CLI smoke check verifies the schema in a temporary database. The regression
+suites cover login auditing, permissions, input validation, stock operations,
+browser backup restore and concurrent requests with separate demo workspaces.
+Run the commands in the [verification guide](TESTING.md).
 
 ## Repository hygiene
 
-Publish source and synthetic examples only. Do not commit `data/`, SQLite files, reports, backups, environment files or credentials. Never run `git add .` before inspecting staged filenames. Source import no longer creates data directories; CLI database/report paths are created when needed.
+Publish source and synthetic examples only. Keep `data/`, SQLite files, reports,
+backups, environment files and credentials outside source control. The CLI
+creates its directories when run. Importing the Flask app performs no disk writes.

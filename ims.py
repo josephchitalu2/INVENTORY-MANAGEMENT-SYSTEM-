@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Chitalu Software Solutions - Inventory Management System v5.0
+"""Inventory Management System v5.0
 
 A deliberately small, real SQLite-backed inventory system.  The CLI is only a
 presentation layer; business rules live in services and database writes that
@@ -25,7 +25,7 @@ from getpass import getpass
 from pathlib import Path
 from typing import Any, Iterator
 
-APP_NAME = "IMS by Chitalu Software Solutions"
+APP_NAME = "Chitalu Software Solutions IMS"
 APP_VERSION = "5.0"
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -37,7 +37,7 @@ ALLOWED_UNITS = {"kg", "pack", "bottle", "piece"}
 DISCRETE_UNITS = {"pack", "bottle", "piece"}
 ROLES = {"admin", "manager", "staff"}
 
-# Web requests use isolated in-memory connections. CLI keeps its on-disk DB.
+# A Flask request can lend its private SQLite connection to the IMS services.
 REQUEST_DATABASE: ContextVar[sqlite3.Connection | None] = ContextVar("request_database", default=None)
 
 
@@ -83,7 +83,9 @@ def validate_quantity(amount: float, unit: str) -> float:
         value = float(amount)
     except (TypeError, ValueError):
         raise ValidationError("Quantity must be a number")
-    if not math.isfinite(value) or value <= 0:
+    if not math.isfinite(value):
+        raise ValidationError("Quantity must be finite")
+    if value <= 0:
         raise ValidationError("Quantity must be greater than zero")
     if unit not in ALLOWED_UNITS:
         raise ValidationError(f"Invalid unit '{unit}'. Allowed: {', '.join(sorted(ALLOWED_UNITS))}")
@@ -97,7 +99,9 @@ def validate_price(value: float, field: str) -> float:
         result = float(value)
     except (TypeError, ValueError):
         raise ValidationError(f"{field} must be a number")
-    if not math.isfinite(result) or result < 0:
+    if not math.isfinite(result):
+        raise ValidationError(f"{field} must be finite")
+    if result < 0:
         raise ValidationError(f"{field} cannot be negative")
     return result
 
@@ -281,7 +285,9 @@ class AuthService:
         user = self.users.find(user_id)
         if not user:
             raise UserNotFoundError("User not found")
-        if not user["active"] or user["role"] not in allowed:
+        if not user["active"]:
+            raise AuthorizationError("Your account is inactive")
+        if user["role"] not in allowed:
             raise AuthorizationError("You are not authorized to perform this operation")
         return user
 
@@ -310,8 +316,13 @@ class InventoryService:
         name = name.strip()
         if not name:
             raise ValidationError("Item name is required")
-        quantity = float(quantity)
-        if not math.isfinite(quantity) or quantity < 0:
+        try:
+            quantity = float(quantity)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("Quantity must be a number") from exc
+        if not math.isfinite(quantity):
+            raise ValidationError("Quantity must be finite")
+        if quantity < 0:
             raise ValidationError("Quantity cannot be negative")
         if unit_type not in ALLOWED_UNITS:
             raise ValidationError("Invalid unit")
@@ -319,8 +330,13 @@ class InventoryService:
             raise ValidationError(f"{unit_type} quantities must be whole numbers")
         cost_price = validate_price(cost_price, "Cost price")
         selling_price = validate_price(selling_price, "Selling price")
-        reorder_level = float(reorder_level)
-        if not math.isfinite(reorder_level) or reorder_level < 0:
+        try:
+            reorder_level = float(reorder_level)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("Reorder level must be a number") from exc
+        if not math.isfinite(reorder_level):
+            raise ValidationError("Reorder level must be finite")
+        if reorder_level < 0:
             raise ValidationError("Reorder level cannot be negative")
         if unit_type in DISCRETE_UNITS and not reorder_level.is_integer():
             raise ValidationError(f"{unit_type} reorder levels must be whole numbers")
@@ -370,14 +386,22 @@ class InventoryService:
         if "cost_price" in changes: changes["cost_price"] = validate_price(changes["cost_price"], "Cost price")
         if "selling_price" in changes: changes["selling_price"] = validate_price(changes["selling_price"], "Selling price")
         if "reorder_level" in changes:
-            changes["reorder_level"] = float(changes["reorder_level"])
-            if not math.isfinite(changes["reorder_level"]) or changes["reorder_level"] < 0: raise ValidationError("Reorder level must be finite and nonnegative")
+            try:
+                changes["reorder_level"] = float(changes["reorder_level"])
+            except (TypeError, ValueError) as exc:
+                raise ValidationError("Reorder level must be a number") from exc
+            if not math.isfinite(changes["reorder_level"]): raise ValidationError("Reorder level must be finite")
+            if changes["reorder_level"] < 0: raise ValidationError("Reorder level cannot be negative")
             if unit in DISCRETE_UNITS and not changes["reorder_level"].is_integer(): raise ValidationError(f"{unit} reorder level must be whole")
-        if "name" in changes: changes["name"] = str(changes["name"]).strip()
-        if not changes.get("name", current["name"]):
-            raise ValidationError("Item name is required")
-        if unit != current["unit_type"]:
-            raise ValidationError("Unit changes require a stock conversion workflow; create a new item instead")
+        if "name" in changes:
+            changes["name"] = str(changes["name"]).strip()
+            if not changes["name"]:
+                raise ValidationError("Item name is required")
+        if unit in DISCRETE_UNITS:
+            if not float(current["quantity"]).is_integer():
+                raise ValidationError("Cannot use a whole-item unit with fractional stock")
+            if not float(changes.get("reorder_level", current["reorder_level"])).is_integer():
+                raise ValidationError("Cannot use a whole-item unit with a fractional reorder level")
         fields = ", ".join(f"{k}=?" for k in changes)
         with transaction() as conn:
             try:
@@ -551,14 +575,12 @@ def main() -> None:
     if args.db:
         DATABASE_PATH=Path(args.db).expanduser().resolve()
         DATA_DIR=DATABASE_PATH.parent; BACKUP_DIR=DATA_DIR/"backups"; REPORT_DIR=DATA_DIR/"reports"
-        for d in (DATA_DIR,BACKUP_DIR,REPORT_DIR): d.mkdir(parents=True,exist_ok=True)
+    for directory in (DATA_DIR, BACKUP_DIR, REPORT_DIR):
+        directory.mkdir(parents=True, exist_ok=True)
     init_database()
     if args.init_db: print(f"Database ready: {DATABASE_PATH}"); return
     if args.seed_demo:
-        auth=AuthService()
-        if auth.users.count()==0: raise SystemExit("Create an administrator first, then run --seed-demo.")
-        uid=auth.users.all()[0]["id"]
-        print(f"Seeded {seed_demo(uid)} demo items."); return
+        raise SystemExit("Unauthenticated --seed-demo is disabled. Sign in as admin and use menu 13.")
     run_cli()
 
 
