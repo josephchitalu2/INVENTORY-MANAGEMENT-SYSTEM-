@@ -47,7 +47,7 @@ Old/new audit values are generally JSON text, but the password-change entry stor
 
 Follow the [operator guide](OPERATOR_GUIDE.md) to create an admin, seed demo items, record movements, inspect low stock and export reports. Menu 6 keeps blank fields unchanged. Menu 10 changes your password. Stock-out values use the item's cost price, not sales revenue. The application is not a complete POS/accounting system.
 
-Reports go into the active data directory's `reports/` folder with a timestamped name. An empty report contains `No records`. Same-prefix exports within one second can overwrite each other.
+Reports go into the active data directory's `reports/` folder with a timestamped name. If a filename is taken, the exporter adds a numbered suffix. An empty report contains `No records`.
 
 ## Security controls and limits
 
@@ -65,7 +65,7 @@ The current main branch persists successful-login audit rows, rejects non-finite
 4. Concurrent-user races, migrations, session lifecycle and concurrent first-admin creation require further work.
 5. The first-admin precheck occurs outside its write transaction.
 6. Audit records can be modified by someone with database access and are not tamper-proof.
-7. Report filenames can collide within one second; audit values do not have one consistent serialization format.
+7. Audit values use multiple serialization formats.
 
 Stop the app before an ordinary database-file copy. A future backup workflow should use SQLite's backup API and validate restoration.
 

@@ -13,7 +13,7 @@ Current main persists successful-login audit entries, rejects non-finite numeric
 - Test concurrent writes and simultaneous first-admin creation.
 - Provide verified SQLite backup creation and a restore workflow.
 - Add schema versioning and migrations; preserve originals when upgrading.
-- Define item archiving, audit formats and unique report filenames.
+- Define item archiving and audit formats.
 
 ## Business requirements
 

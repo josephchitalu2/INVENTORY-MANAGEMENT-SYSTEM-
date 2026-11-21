@@ -22,6 +22,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from getpass import getpass
+from itertools import count
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -437,13 +438,26 @@ class ReportService:
 
     def write_csv(self, rows: list[dict[str, Any]], prefix: str) -> Path:
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
-        path = REPORT_DIR / f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        if not rows:
-            path.write_text("No records\n", encoding="utf-8")
-            return path
-        with path.open("w", newline="", encoding="utf-8") as fh:
-            writer = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
-            writer.writeheader(); writer.writerows(rows)
+        stem = f"{prefix}_{datetime.now():%Y%m%d_%H%M%S}"
+        for number in count():
+            suffix = f"_{number}" if number else ""
+            path = REPORT_DIR / f"{stem}{suffix}.csv"
+            try:
+                report = path.open("x", newline="", encoding="utf-8")
+                break
+            except FileExistsError:
+                continue
+        try:
+            with report:
+                if rows:
+                    writer = csv.DictWriter(report, fieldnames=list(rows[0]))
+                    writer.writeheader()
+                    writer.writerows(rows)
+                else:
+                    report.write("No records\n")
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
         return path
 
 

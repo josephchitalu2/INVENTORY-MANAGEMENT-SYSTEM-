@@ -14,6 +14,8 @@ The smoke check copies `ims.py` into a temporary directory, runs `--init-db` wit
 
 The standard-library unittest suite uses a temporary SQLite database and tests persisted successful-login auditing, disabled-account authorization, invalid non-finite numbers, discrete-unit constraints, rejected stock deductions, unit changes and item name validation. GitHub Actions runs these checks on pushes and pull requests. They do not establish production readiness or replace a real browser/terminal demonstration.
 
+`tests/test_report_exports.py` checks simultaneous CSV exports and cleanup after a write error. It uses a temporary reports directory. Run it with `python3 -m unittest discover -s tests -p test_report_exports.py -v` or as part of the full suite below.
+
 ## Flask demo checks
 
 Use the [demo setup](../README.md#browser-demo) to install Flask, then run
